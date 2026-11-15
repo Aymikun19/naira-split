@@ -1,3 +1,4 @@
+import { SITE_URL } from "@/lib/supabase/config";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/supabase/server";
 import { balances, naira, settleUp } from "@/lib/settle";
@@ -27,7 +28,7 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
   );
   const transfers = settleUp(bal);
   const total = list.filter((e) => !e.is_settlement).reduce((s, e) => s + Number(e.amount_kobo), 0);
-  const site = process.env.NEXT_PUBLIC_SITE_URL ?? "";
+  const site = SITE_URL;
   const meId = members.find((m) => m.user_id === user.id)?.id;
 
   return (
