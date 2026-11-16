@@ -1,3 +1,5 @@
+<img src="public/logo.svg" alt="" width="64" height="64">
+
 # NairaSplit
 
 Split shared expenses with friends, roommates or trip groups, **in naira**, and settle up with as few bank transfers as possible.

@@ -1,3 +1,4 @@
+import { Banknote, CircleCheck, Trash2 } from "lucide-react";
 import { SITE_URL } from "@/lib/supabase/config";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/supabase/server";
@@ -41,7 +42,9 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
       <section className="card p-5">
         <h2 className="font-semibold">Settle up</h2>
         {transfers.length === 0 ? (
-          <p className="mt-2 text-sm text-emerald-700">Everyone is square 🎉</p>
+          <p className="mt-2 inline-flex items-center gap-1.5 text-sm text-emerald-700">
+            <CircleCheck size={16} aria-hidden /> Everyone is square
+          </p>
         ) : (
           <ul className="mt-3 grid gap-2">
             {transfers.map((t, i) => (
@@ -77,12 +80,18 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
         {list.map((e) => (
           <div key={e.id} className="flex items-center justify-between gap-3 p-4 text-sm">
             <div>
-              <p className="font-medium">{e.is_settlement ? `💸 ${name.get(e.paid_by)} paid ${name.get(e.expense_shares[0]?.member_id)}` : e.description}</p>
+              <p className="font-medium">{e.is_settlement ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Banknote size={16} className="text-accent" aria-hidden /> {name.get(e.paid_by)} paid {name.get(e.expense_shares[0]?.member_id)}
+                  </span>
+                ) : (
+                  e.description
+                )}</p>
               {!e.is_settlement && <p className="text-xs text-stone-500">Paid by {name.get(e.paid_by)} · split {e.expense_shares.length} ways</p>}
             </div>
             <div className="flex items-center gap-3">
               <span className="font-semibold">{naira(Number(e.amount_kobo))}</span>
-              <form action={deleteExpense.bind(null, id, e.id)}><button className="text-xs text-stone-400 hover:text-red-500">✕</button></form>
+              <form action={deleteExpense.bind(null, id, e.id)}><button className="text-stone-400 hover:text-red-500" aria-label="Delete expense"><Trash2 size={15} /></button></form>
             </div>
           </div>
         ))}
