@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/supabase/server";
-import { splitEvenly, toKobo } from "@/lib/settle";
+import { splitByPercent, splitEvenly, splitExact, toKobo } from "@/lib/settle";
 
 const nameOf = (user: { email?: string; user_metadata?: { full_name?: string } }) =>
   user.user_metadata?.full_name || user.email?.split("@")[0] || "Me";
@@ -31,10 +31,18 @@ export async function addExpense(groupId: string, _prev: { error?: string }, for
   const description = String(form.get("description") || "").trim();
   const paidBy = String(form.get("paid_by"));
   const among = form.getAll("among").map(String);
+  const mode = String(form.get("mode") || "equal");
   if (!description) return { error: "What was it for?" };
+  if (!Number.isInteger(amount) || amount <= 0) return { error: "Enter an amount greater than zero." };
   let shares;
   try {
-    shares = splitEvenly(amount, among);
+    if (mode === "exact") {
+      shares = splitExact(amount, among.map((memberId) => ({ memberId, kobo: toKobo(String(form.get(`exact_${memberId}`) || "0")) })));
+    } else if (mode === "percent") {
+      shares = splitByPercent(amount, among.map((memberId) => ({ memberId, pct: Number(form.get(`pct_${memberId}`) || 0) })));
+    } else {
+      shares = splitEvenly(amount, among);
+    }
   } catch (e) {
     return { error: (e as Error).message };
   }

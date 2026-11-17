@@ -52,3 +52,31 @@ export const naira = (kobo: number) =>
   new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(kobo / 100);
 
 export const toKobo = (nairaInput: string) => Math.round(Number(nairaInput.replace(/[,₦\s]/g, "")) * 100);
+
+/** Exact amounts per person; they must add up to the total. */
+export function splitExact(totalKobo: number, parts: Share[]): Share[] {
+  const used = parts.filter((p) => p.kobo > 0);
+  if (used.length === 0) throw new Error("Enter at least one amount");
+  if (used.some((p) => !Number.isInteger(p.kobo) || p.kobo < 0)) throw new Error("Amounts must be positive");
+  const sum = used.reduce((s, p) => s + p.kobo, 0);
+  if (sum !== totalKobo) throw new Error(`The amounts add up to ${naira(sum)}, not ${naira(totalKobo)}`);
+  return used;
+}
+
+/** Split by percentages (must total 100). Rounding leftovers go to the largest remainders. */
+export function splitByPercent(totalKobo: number, parts: { memberId: string; pct: number }[]): Share[] {
+  const used = parts.filter((p) => p.pct > 0);
+  if (used.length === 0) throw new Error("Enter at least one percentage");
+  const pctSum = used.reduce((s, p) => s + p.pct, 0);
+  if (Math.abs(pctSum - 100) > 0.001) throw new Error(`Percentages add up to ${pctSum}%, not 100%`);
+  const raw = used.map((p) => ({ memberId: p.memberId, exact: (totalKobo * p.pct) / 100 }));
+  const out = raw.map((r) => ({ memberId: r.memberId, kobo: Math.floor(r.exact) }));
+  let rest = totalKobo - out.reduce((s, o) => s + o.kobo, 0);
+  const order = raw.map((r, i) => ({ i, frac: r.exact - Math.floor(r.exact) })).sort((a, b) => b.frac - a.frac);
+  for (const { i } of order) {
+    if (rest <= 0) break;
+    out[i].kobo++;
+    rest--;
+  }
+  return out;
+}

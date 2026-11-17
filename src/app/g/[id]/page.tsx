@@ -1,8 +1,11 @@
-import { Banknote, CircleCheck, Trash2 } from "lucide-react";
-import { SITE_URL } from "@/lib/supabase/config";
+import { ArrowRight, Banknote, CircleCheck, Download, Receipt, Scale, Trash2, UserPlus, Users, Wallet } from "lucide-react";
+import Link from "next/link";
 import { notFound } from "next/navigation";
+import { SITE_URL } from "@/lib/supabase/config";
 import { requireUser } from "@/lib/supabase/server";
 import { balances, naira, settleUp } from "@/lib/settle";
+import { CopyButton } from "@/components/kit/CopyButton";
+import { EmptyState, Stat } from "@/components/kit/Stat";
 import { addMember, deleteExpense, recordSettlement } from "../../actions";
 import { ExpenseForm } from "./ExpenseForm";
 
@@ -10,6 +13,8 @@ type Exp = {
   id: string; paid_by: string; amount_kobo: number; description: string; is_settlement: boolean; created_at: string;
   expense_shares: { member_id: string; share_kobo: number }[];
 };
+
+const day = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "Africa/Lagos" });
 
 export default async function GroupPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -28,74 +33,137 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
     list.map((e) => ({ paidBy: e.paid_by, amount: Number(e.amount_kobo), shares: e.expense_shares.map((s) => ({ memberId: s.member_id, kobo: Number(s.share_kobo) })) })),
   );
   const transfers = settleUp(bal);
-  const total = list.filter((e) => !e.is_settlement).reduce((s, e) => s + Number(e.amount_kobo), 0);
-  const site = SITE_URL;
+  const spending = list.filter((e) => !e.is_settlement);
+  const total = spending.reduce((s, e) => s + Number(e.amount_kobo), 0);
   const meId = members.find((m) => m.user_id === user.id)?.id;
+  const myShare = spending.reduce((s, e) => s + Number(e.expense_shares.find((x) => x.member_id === meId)?.share_kobo ?? 0), 0);
+  const myBal = meId ? (bal.get(meId) ?? 0) : 0;
+  const invite = `${SITE_URL}/join/${group.invite_code}`;
+  const maxAbs = Math.max(1, ...[...bal.values()].map(Math.abs));
+  const paidBy = new Map<string, number>();
+  for (const e of spending) paidBy.set(e.paid_by, (paidBy.get(e.paid_by) ?? 0) + Number(e.amount_kobo));
+  const byDay = new Map<string, Exp[]>();
+  for (const e of list) byDay.set(day(e.created_at), [...(byDay.get(day(e.created_at)) ?? []), e]);
 
   return (
-    <div className="grid gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold">{group.name}</h1>
-        <p className="text-sm text-stone-500">Total spent {naira(total)} · Invite: <code className="rounded bg-stone-100 px-1">{site}/join/{group.invite_code}</code></p>
+    <div className="grid gap-8">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <Link href="/" className="text-sm text-stone-500 hover:text-accent">Your groups</Link>
+          <h1 className="page-title mt-1">{group.name}</h1>
+          <p className="mt-1 text-sm text-stone-500">{members.length} people · {spending.length} expenses</p>
+        </div>
+        <a href={`/g/${id}/export`} className="btn-outline"><Download size={15} aria-hidden /> Export CSV</a>
       </div>
 
-      <section className="card p-5">
-        <h2 className="font-semibold">Settle up</h2>
-        {transfers.length === 0 ? (
-          <p className="mt-2 inline-flex items-center gap-1.5 text-sm text-emerald-700">
-            <CircleCheck size={16} aria-hidden /> Everyone is square
-          </p>
-        ) : (
-          <ul className="mt-3 grid gap-2">
-            {transfers.map((t, i) => (
-              <li key={i} className="flex items-center justify-between gap-2 text-sm">
-                <span><b>{name.get(t.from)}</b> pays <b>{name.get(t.to)}</b> {naira(t.kobo)}</span>
-                <form action={recordSettlement.bind(null, id, t.from, t.to, t.kobo)}>
-                  <button className="btn-outline !py-1 text-xs">Mark paid</button>
-                </form>
-              </li>
-            ))}
-          </ul>
-        )}
-        <div className="mt-4 flex flex-wrap gap-2">
-          {members.map((m) => {
-            const v = bal.get(m.id) ?? 0;
-            return (
-              <span key={m.id} className={`badge ${v > 0 ? "!bg-emerald-100 !text-emerald-800" : v < 0 ? "!bg-red-100 !text-red-700" : ""}`}>
-                {m.display_name}: {v > 0 ? "+" : ""}{naira(v)}
-              </span>
-            );
-          })}
-        </div>
-      </section>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Stat icon={Receipt} label="Total spent" value={naira(total)} />
+        <Stat icon={Wallet} label="Your share" value={naira(myShare)} hint={total ? `${Math.round((myShare / total) * 100)}% of the total` : undefined} />
+        <Stat icon={Scale} label="Your balance" value={`${myBal > 0 ? "+" : ""}${naira(myBal)}`} hint={myBal > 0 ? "You are owed" : myBal < 0 ? "You owe" : "You are square"} />
+        <Stat icon={Users} label="Top payer" value={paidBy.size ? (name.get([...paidBy].sort((a, b) => b[1] - a[1])[0][0]) ?? "–") : "–"} hint={paidBy.size ? naira([...paidBy.values()].sort((a, b) => b - a)[0]) : undefined} />
+      </div>
 
-      <ExpenseForm groupId={id} members={members} meId={meId} />
-
-      <form action={addMember.bind(null, id)} className="flex gap-2">
-        <input name="display_name" placeholder="Add someone without an account" className="flex-1 rounded-xl border border-stone-300 px-3 py-2 text-sm" />
-        <button className="btn-outline">Add</button>
-      </form>
-
-      <section className="card divide-y divide-stone-100">
-        {list.map((e) => (
-          <div key={e.id} className="flex items-center justify-between gap-3 p-4 text-sm">
-            <div>
-              <p className="font-medium">{e.is_settlement ? (
-                  <span className="inline-flex items-center gap-1.5">
-                    <Banknote size={16} className="text-accent" aria-hidden /> {name.get(e.paid_by)} paid {name.get(e.expense_shares[0]?.member_id)}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <section className="card p-6" aria-labelledby="settle">
+          <h2 id="settle" className="font-semibold">Settle up</h2>
+          <p className="mt-1 text-sm text-stone-500">The fewest transfers that clear every debt.</p>
+          {transfers.length === 0 ? (
+            <p className="mt-4 inline-flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+              <CircleCheck size={16} aria-hidden /> Everyone is square
+            </p>
+          ) : (
+            <ul className="mt-4 grid gap-2">
+              {transfers.map((t, i) => (
+                <li key={i} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-stone-200 p-3 text-sm">
+                  <span className="flex items-center gap-2">
+                    <b>{name.get(t.from)}</b> <ArrowRight size={14} className="text-stone-400" aria-label="pays" /> <b>{name.get(t.to)}</b>
+                    <span className="font-semibold text-accent">{naira(t.kobo)}</span>
                   </span>
-                ) : (
-                  e.description
-                )}</p>
-              {!e.is_settlement && <p className="text-xs text-stone-500">Paid by {name.get(e.paid_by)} · split {e.expense_shares.length} ways</p>}
+                  <form action={recordSettlement.bind(null, id, t.from, t.to, t.kobo)}>
+                    <button className="btn-outline !py-1.5 text-xs"><Banknote size={14} aria-hidden /> Mark paid</button>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="card p-6" aria-labelledby="balances">
+          <h2 id="balances" className="mb-4 font-semibold">Balances</h2>
+          <ul className="grid gap-3">
+            {members.map((m) => {
+              const v = bal.get(m.id) ?? 0;
+              const w = `${(Math.abs(v) / maxAbs) * 50}%`;
+              return (
+                <li key={m.id} className="grid grid-cols-[110px_1fr_auto] items-center gap-3 text-sm">
+                  <span className="truncate">{m.display_name}{m.id === meId && <span className="text-stone-400"> (you)</span>}</span>
+                  <span className="relative h-3 rounded-full bg-stone-100" aria-hidden>
+                    <span className="absolute inset-y-0 left-1/2 w-px bg-stone-300" />
+                    <span className={`absolute inset-y-0 rounded-full ${v >= 0 ? "left-1/2 bg-emerald-500" : "right-1/2 bg-red-400"}`} style={{ width: w }} />
+                  </span>
+                  <span className={`w-28 text-right font-medium tabular-nums ${v > 0 ? "text-emerald-700" : v < 0 ? "text-red-600" : "text-stone-500"}`}>
+                    {v > 0 ? "+" : ""}{naira(v)}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="mt-4 text-xs text-stone-500">Green is owed money, red owes money.</p>
+        </section>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
+        <ExpenseForm groupId={id} members={members} meId={meId} />
+        <div className="grid h-fit gap-6">
+          <section className="card grid gap-3 p-6" aria-labelledby="invite">
+            <h2 id="invite" className="font-semibold">Invite friends</h2>
+            <p className="break-all rounded-xl bg-stone-50 px-3 py-2 font-mono text-xs text-stone-600">{invite}</p>
+            <div className="flex flex-wrap gap-2">
+              <CopyButton value={invite} label="Copy invite link" />
+              <a className="btn-outline" href={`https://wa.me/?text=${encodeURIComponent(`Join "${group.name}" on NairaSplit: ${invite}`)}`} target="_blank" rel="noreferrer">
+                Share on WhatsApp
+              </a>
             </div>
-            <div className="flex items-center gap-3">
-              <span className="font-semibold">{naira(Number(e.amount_kobo))}</span>
-              <form action={deleteExpense.bind(null, id, e.id)}><button className="text-stone-400 hover:text-red-500" aria-label="Delete expense"><Trash2 size={15} /></button></form>
+          </section>
+          <form action={addMember.bind(null, id)} className="card grid gap-3 p-6">
+            <h2 className="font-semibold">Add someone without an account</h2>
+            <div className="flex gap-2">
+              <input name="display_name" required placeholder="Their name" className="input" aria-label="Name" />
+              <button className="btn-outline shrink-0"><UserPlus size={15} aria-hidden /> Add</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <section className="grid gap-4" aria-labelledby="history">
+        <h2 id="history" className="text-lg font-semibold">History</h2>
+        {list.length === 0 && <EmptyState icon={Receipt} title="No expenses yet" text="Add the first one above and balances will update for everyone." />}
+        {[...byDay].map(([d, items]) => (
+          <div key={d} className="grid gap-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-stone-500">{d}</h3>
+            <div className="card divide-y divide-stone-100">
+              {items.map((e) => (
+                <div key={e.id} className="flex items-center justify-between gap-3 p-4 text-sm">
+                  <div className="flex items-center gap-3">
+                    <span className={`grid size-9 place-items-center rounded-xl ${e.is_settlement ? "bg-emerald-50 text-emerald-700" : "bg-accent/10 text-accent"}`}>
+                      {e.is_settlement ? <Banknote size={16} aria-hidden /> : <Receipt size={16} aria-hidden />}
+                    </span>
+                    <div>
+                      <p className="font-medium">{e.is_settlement ? `${name.get(e.paid_by)} paid ${name.get(e.expense_shares[0]?.member_id)}` : e.description}</p>
+                      {!e.is_settlement && <p className="text-xs text-stone-500">Paid by {name.get(e.paid_by)} · split {e.expense_shares.length} ways</p>}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold tabular-nums">{naira(Number(e.amount_kobo))}</span>
+                    <form action={deleteExpense.bind(null, id, e.id)}>
+                      <button className="btn-ghost !p-2 hover:!bg-red-50 hover:!text-red-600" aria-label={`Delete ${e.description}`}><Trash2 size={15} aria-hidden /></button>
+                    </form>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         ))}
-        {list.length === 0 && <p className="p-4 text-sm text-stone-500">No expenses yet.</p>}
       </section>
     </div>
   );

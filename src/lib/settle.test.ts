@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { balances, settleUp, splitEvenly, toKobo } from "./settle";
+import { balances, settleUp, splitByPercent, splitEvenly, splitExact, toKobo } from "./settle";
 
 describe("splitEvenly", () => {
   it("splits exactly and distributes leftover kobo", () => {
@@ -59,5 +59,21 @@ describe("toKobo", () => {
   it("parses naira strings", () => {
     expect(toKobo("₦1,250.50")).toBe(125050);
     expect(toKobo("3000")).toBe(300000);
+  });
+});
+
+describe("custom splits", () => {
+  it("accepts exact amounts that add up", () => {
+    expect(splitExact(1000, [{ memberId: "a", kobo: 700 }, { memberId: "b", kobo: 300 }, { memberId: "c", kobo: 0 }])).toHaveLength(2);
+  });
+  it("rejects exact amounts that do not add up", () => {
+    expect(() => splitExact(1000, [{ memberId: "a", kobo: 600 }])).toThrow(/add up/);
+  });
+  it("splits by percent and keeps every kobo", () => {
+    const s = splitByPercent(1000, [{ memberId: "a", pct: 33.33 }, { memberId: "b", pct: 33.33 }, { memberId: "c", pct: 33.34 }]);
+    expect(s.reduce((n, x) => n + x.kobo, 0)).toBe(1000);
+  });
+  it("rejects percentages that do not total 100", () => {
+    expect(() => splitByPercent(1000, [{ memberId: "a", pct: 50 }])).toThrow(/100%/);
   });
 });
