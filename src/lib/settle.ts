@@ -48,8 +48,14 @@ export function settleUp(bal: Map<string, number>): Transfer[] {
   return out;
 }
 
+/** ₦7,500 for whole amounts, ₦7,512.50 when there are kobo. */
 export const naira = (kobo: number) =>
-  new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(kobo / 100);
+  new Intl.NumberFormat("en-NG", {
+    style: "currency",
+    currency: "NGN",
+    minimumFractionDigits: kobo % 100 === 0 ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(kobo / 100);
 
 export const toKobo = (nairaInput: string) => Math.round(Number(nairaInput.replace(/[,₦\s]/g, "")) * 100);
 

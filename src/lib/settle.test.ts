@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { balances, settleUp, splitByPercent, splitEvenly, splitExact, toKobo } from "./settle";
+import { balances, naira, settleUp, splitByPercent, splitEvenly, splitExact, toKobo } from "./settle";
 
 describe("splitEvenly", () => {
   it("splits exactly and distributes leftover kobo", () => {
@@ -75,5 +75,12 @@ describe("custom splits", () => {
   });
   it("rejects percentages that do not total 100", () => {
     expect(() => splitByPercent(1000, [{ memberId: "a", pct: 50 }])).toThrow(/100%/);
+  });
+});
+
+describe("naira formatting", () => {
+  it("drops kobo for whole amounts and keeps them otherwise", () => {
+    expect(naira(15150000)).toBe("₦151,500");
+    expect(naira(787550)).toBe("₦7,875.50");
   });
 });
