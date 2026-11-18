@@ -26,5 +26,5 @@ export const brand = {
   nav: [{ href: "/", label: "Groups" }] as { href: string; label: string; public?: boolean }[],
   width: "max-w-4xl",
   repo: "https://github.com/Aymikun19/naira-split",
-  preview: null as string | null,
+  preview: "/preview.webp" as string | null,
 };
