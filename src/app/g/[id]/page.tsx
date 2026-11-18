@@ -1,5 +1,6 @@
 import { ArrowRight, Banknote, CircleCheck, Download, Receipt, Scale, Trash2, UserPlus, Users, Wallet } from "lucide-react";
 import Link from "next/link";
+import { Avatar } from "@/components/kit/Avatar";
 import { notFound } from "next/navigation";
 import { SITE_URL } from "@/lib/supabase/config";
 import { requireUser } from "@/lib/supabase/server";
@@ -97,8 +98,11 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
               const v = bal.get(m.id) ?? 0;
               const w = `${(Math.abs(v) / maxAbs) * 50}%`;
               return (
-                <li key={m.id} className="grid grid-cols-[110px_1fr_auto] items-center gap-3 text-sm">
-                  <span className="truncate">{m.display_name}{m.id === meId && <span className="text-stone-400"> (you)</span>}</span>
+                <li key={m.id} className="grid grid-cols-[140px_1fr_auto] items-center gap-3 text-sm">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <Avatar userId={m.user_id} name={m.display_name} hasPhoto={Boolean(m.user_id)} size={26} tone={m.id === meId ? "accent" : "muted"} />
+                    <span className="truncate">{m.display_name}{m.id === meId && <span className="text-stone-400"> (you)</span>}</span>
+                  </span>
                   <span className="relative h-3 rounded-full bg-stone-100" aria-hidden>
                     <span className="absolute inset-y-0 left-1/2 w-px bg-stone-300" />
                     <span className={`absolute inset-y-0 rounded-full ${v >= 0 ? "left-1/2 bg-emerald-500" : "right-1/2 bg-red-400"}`} style={{ width: w }} />
