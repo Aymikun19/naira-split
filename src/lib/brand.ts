@@ -13,7 +13,7 @@ export const brand = {
     { icon: ReceiptText, title: "Log expenses in seconds", text: "Record what was bought, who paid and who shared it. Splits are exact to the kobo." },
     { icon: ArrowLeftRight, title: "Fewest transfers", text: "A settle-up plan that clears every debt with the minimum number of bank transfers." },
     { icon: HandCoins, title: "Record repayments", text: "Mark a transfer as paid and balances update for everyone in the group." },
-    { icon: ChartPie, title: "Spending insights", text: "See total spent, each person's net balance and who has paid the most." },
+    { icon: ChartPie, title: "Spending by category", text: "Food, transport, rent and bills are tagged automatically, so you can see exactly where the group's money went." },
     { icon: Link2, title: "Invite by link", text: "Share one link in your group chat and friends join with a tap." },
     { icon: FileDown, title: "Export to CSV", text: "Download every expense for your records or to settle a debate." },
   ],

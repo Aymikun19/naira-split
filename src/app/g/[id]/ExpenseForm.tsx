@@ -3,6 +3,7 @@
 import { useActionState, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { naira, toKobo } from "@/lib/settle";
+import { CATEGORIES, guessCategory, type CategoryId } from "@/lib/categories";
 import { addExpense } from "../../actions";
 
 type Mode = "equal" | "exact" | "percent";
@@ -13,12 +14,17 @@ export function ExpenseForm({ groupId, members, meId }: { groupId: string; membe
   const [amount, setAmount] = useState("");
   const [picked, setPicked] = useState<string[]>(members.map((m) => m.id));
   const [values, setValues] = useState<Record<string, string>>({});
+  const [cat, setCat] = useState<CategoryId | null>(null);
+  const [desc, setDesc] = useState("");
+  const shownCat = cat ?? (desc ? guessCategory(desc) : "other");
   const [state, action, pending] = useActionState<{ error?: string; ok?: number }, FormData>(async (p, f) => {
     const r = await addExpense(groupId, p, f);
     if (r.error) return r;
     ref.current?.reset();
     setAmount("");
     setValues({});
+    setCat(null);
+    setDesc("");
     return { ok: Date.now() };
   }, {});
 
@@ -38,9 +44,25 @@ export function ExpenseForm({ groupId, members, meId }: { groupId: string; membe
       <h2 className="font-semibold">Add an expense</h2>
       <input type="hidden" name="mode" value={mode} />
       <div className="grid gap-3 sm:grid-cols-[1fr_160px]">
-        <label className="field"><span>Description</span><input name="description" required placeholder="Suya and drinks" /></label>
+        <label className="field"><span>Description</span><input name="description" required placeholder="Suya and drinks" value={desc} onChange={(e) => setDesc(e.target.value)} /></label>
         <label className="field"><span>Amount (₦)</span><input name="amount" inputMode="decimal" required placeholder="7,500" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
       </div>
+      <fieldset>
+        <legend className="mb-2 text-sm font-medium text-stone-700">Category</legend>
+        <input type="hidden" name="category" value={shownCat} />
+        <div className="flex flex-wrap gap-1.5">
+          {CATEGORIES.map((c) => {
+            const on = shownCat === c.id;
+            return (
+              <button key={c.id} type="button" aria-pressed={on} onClick={() => setCat(c.id)}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition ${on ? "border-transparent text-white" : "border-stone-200 text-stone-600 hover:border-stone-300"}`}
+                style={on ? { background: c.color } : undefined}>
+                <c.icon size={13} aria-hidden /> {c.label}
+              </button>
+            );
+          })}
+        </div>
+      </fieldset>
       <label className="field">
         <span>Paid by</span>
         <select name="paid_by" defaultValue={meId}>{members.map((m) => <option key={m.id} value={m.id}>{m.display_name}</option>)}</select>

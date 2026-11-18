@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { CATEGORIES, guessCategory } from "@/lib/categories";
 import { requireUser } from "@/lib/supabase/server";
 import { splitByPercent, splitEvenly, splitExact, toKobo } from "@/lib/settle";
 
@@ -24,6 +25,8 @@ export async function addMember(groupId: string, form: FormData) {
   if (name) await supabase.from("members").insert({ group_id: groupId, display_name: name });
   revalidatePath(`/g/${groupId}`);
 }
+
+const CATS = new Set<string>(CATEGORIES.map((c) => c.id));
 
 export async function addExpense(groupId: string, _prev: { error?: string }, form: FormData): Promise<{ error?: string }> {
   const { supabase } = await requireUser();
@@ -52,6 +55,7 @@ export async function addExpense(groupId: string, _prev: { error?: string }, for
     p_amount: amount,
     p_description: description,
     p_shares: shares,
+    p_category: CATS.has(String(form.get("category"))) ? String(form.get("category")) : guessCategory(description),
   });
   if (error) return { error: error.message };
   revalidatePath(`/g/${groupId}`);

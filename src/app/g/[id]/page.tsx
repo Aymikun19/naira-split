@@ -8,9 +8,10 @@ import { CopyButton } from "@/components/kit/CopyButton";
 import { EmptyState, Stat } from "@/components/kit/Stat";
 import { addMember, deleteExpense, recordSettlement } from "../../actions";
 import { ExpenseForm } from "./ExpenseForm";
+import { breakdown, category } from "@/lib/categories";
 
 type Exp = {
-  id: string; paid_by: string; amount_kobo: number; description: string; is_settlement: boolean; created_at: string;
+  id: string; paid_by: string; amount_kobo: number; description: string; is_settlement: boolean; created_at: string; category: string | null;
   expense_shares: { member_id: string; share_kobo: number }[];
 };
 
@@ -42,6 +43,7 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
   const maxAbs = Math.max(1, ...[...bal.values()].map(Math.abs));
   const paidBy = new Map<string, number>();
   for (const e of spending) paidBy.set(e.paid_by, (paidBy.get(e.paid_by) ?? 0) + Number(e.amount_kobo));
+  const cats = breakdown(spending.map((e) => ({ category: e.category, amount: Number(e.amount_kobo) })));
   const byDay = new Map<string, Exp[]>();
   for (const e of list) byDay.set(day(e.created_at), [...(byDay.get(day(e.created_at)) ?? []), e]);
 
@@ -112,6 +114,29 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
         </section>
       </div>
 
+      {cats.length > 0 && (
+        <section className="card grid gap-4 p-6" aria-labelledby="cats">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 id="cats" className="font-semibold">Where the money went</h2>
+            <p className="text-sm text-stone-500">{naira(total)} across {cats.length} {cats.length === 1 ? "category" : "categories"}</p>
+          </div>
+          <div className="flex h-3 overflow-hidden rounded-full bg-stone-100" role="img" aria-label={cats.map((c) => `${c.label} ${c.pct}%`).join(", ")}>
+            {cats.map((c) => <span key={c.id} style={{ width: `${c.pct}%`, background: c.color }} className="h-full border-r-2 border-white last:border-r-0" />)}
+          </div>
+          <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {cats.map((c) => (
+              <li key={c.id} className="flex items-center gap-3 rounded-xl bg-stone-50 p-3 text-sm">
+                <span className="grid size-8 shrink-0 place-items-center rounded-lg text-white" style={{ background: c.color }}><c.icon size={15} aria-hidden /></span>
+                <span className="min-w-0">
+                  <span className="block font-medium">{c.label}</span>
+                  <span className="block truncate text-xs text-stone-500 tabular-nums">{naira(c.kobo)} · {c.pct}%</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
         <ExpenseForm groupId={id} members={members} meId={meId} />
         <div className="grid h-fit gap-6">
@@ -145,12 +170,15 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
               {items.map((e) => (
                 <div key={e.id} className="flex items-center justify-between gap-3 p-4 text-sm">
                   <div className="flex items-center gap-3">
-                    <span className={`grid size-9 place-items-center rounded-xl ${e.is_settlement ? "bg-emerald-50 text-emerald-700" : "bg-accent/10 text-accent"}`}>
-                      {e.is_settlement ? <Banknote size={16} aria-hidden /> : <Receipt size={16} aria-hidden />}
-                    </span>
+                    {(() => {
+                      if (e.is_settlement)
+                        return <span className="grid size-9 place-items-center rounded-xl bg-emerald-50 text-emerald-700"><Banknote size={16} aria-hidden /></span>;
+                      const c = category(e.category);
+                      return <span className="grid size-9 place-items-center rounded-xl text-white" style={{ background: c.color }} title={c.label}><c.icon size={16} aria-hidden /></span>;
+                    })()}
                     <div>
                       <p className="font-medium">{e.is_settlement ? `${name.get(e.paid_by)} paid ${name.get(e.expense_shares[0]?.member_id)}` : e.description}</p>
-                      {!e.is_settlement && <p className="text-xs text-stone-500">Paid by {name.get(e.paid_by)} · split {e.expense_shares.length} ways</p>}
+                      {!e.is_settlement && <p className="text-xs text-stone-500">{category(e.category).label} · paid by {name.get(e.paid_by)} · split {e.expense_shares.length} ways</p>}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
